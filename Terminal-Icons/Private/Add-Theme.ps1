@@ -40,32 +40,42 @@ function Add-Theme {
         foreach ($resolvedPath in $paths) {
             if (Test-Path $resolvedPath) {
                 $item = Get-Item -LiteralPath $resolvedPath
+                $colorData = ConvertFrom-Psd1 $item.FullName
 
                 $statusMsg  = "Adding $($type.ToLower()) theme [$($item.BaseName)]"
                 $confirmMsg = "Are you sure you want to add file [$resolvedPath]?"
                 $operation  = "Add $($Type.ToLower())"
                 if ($PSCmdlet.ShouldProcess($statusMsg, $confirmMsg, $operation) -or $Force.IsPresent) {
-                    if (-not $themeData.Themes.$Type.ContainsKey($item.BaseName) -or $Force.IsPresent) {
-
+                    if (-not $themeData.Themes.$Type.ContainsKey($colorData.Name) -or $Force.IsPresent) {
                         # Convert color theme into escape sequences for lookup later
                         if ($Type -eq 'Color') {
-                            $colorData = ConvertFrom-Psd1 $item.FullName
+                            $script:colorSequences[$colorData.Name] = @{
+                                Name = $colorData.Name
+                                Types = @{
+                                    Directories = @{
+                                        WellKnown = @{}
+                                    }
+                                    Files = @{
+                                        WellKnown = @{}
+                                    }
+                                }
+                            }
+
                             # Directories
                             $colorData.Types.Directories.WellKnown.GetEnumerator().ForEach({
-                                $script:colorSequences[$item.BaseName].Types.Directories[$_.Name] = ConvertFrom-RGBColor -RGB $_.Value
+                                $script:colorSequences[$colorData.Name].Types.Directories[$_.Name] = ConvertFrom-RGBColor -RGB $_.Value
                             })
                             # Wellknown files
                             $colorData.Types.Files.WellKnown.GetEnumerator().ForEach({
-                                $script:colorSequences[$item.BaseName].Types.Files.WellKnown[$_.Name] = ConvertFrom-RGBColor -RGB $_.Value
+                                $script:colorSequences[$colorData.Name].Types.Files.WellKnown[$_.Name] = ConvertFrom-RGBColor -RGB $_.Value
                             })
                             # File extensions
                             $colorData.Types.Files.GetEnumerator().Where({$_.Name -ne 'WellKnown'}).ForEach({
-                                $script:colorSequences[$item.BaseName].Types.Files[$_.Name] = ConvertFrom-RGBColor -RGB $_.Value
+                                $script:colorSequences[$colorData.Name].Types.Files[$_.Name] = ConvertFrom-RGBColor -RGB $_.Value
                             })
                         }
 
-                        $colorData = ConvertFrom-Psd1 $item.FullName
-                        $themeData.Themes.$Type[$item.Basename] = $colorData
+                        $themeData.Themes.$Type[$colorData.Name] = $colorData
                         Save-Theme -Theme $themeData
                     } else {
                         Write-Error "$Type theme [$($item.BaseName)] already exists. Use the -Force switch to overwrite."
